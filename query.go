@@ -42,7 +42,11 @@ type QueryParams struct {
 	ReturnGeometry  *bool // nil = server default (true)
 	ReturnIDsOnly   bool
 	ReturnCountOnly bool
-	Format          OutputFormat
+	// ReturnDistinctValues requests only distinct values for the selected
+	// Fields. Typically combined with Fields (and often OrderByFields) to
+	// enumerate the values present in one or more columns.
+	ReturnDistinctValues bool
+	Format               OutputFormat
 }
 
 // defaults applies sensible defaults to unset fields.
@@ -107,6 +111,9 @@ func (p QueryParams) values() url.Values {
 	if p.ReturnCountOnly {
 		v.Set("returnCountOnly", "true")
 	}
+	if p.ReturnDistinctValues {
+		v.Set("returnDistinctValues", "true")
+	}
 	if p.ReturnGeometry != nil && !*p.ReturnGeometry {
 		v.Set("returnGeometry", "false")
 	}
@@ -162,6 +169,12 @@ func (q *QueryBuilder) OrderBy(fields ...string) *QueryBuilder {
 // GroupBy sets the GROUP BY fields (used with statistics queries).
 func (q *QueryBuilder) GroupBy(fields ...string) *QueryBuilder {
 	q.params.GroupByFields = fields
+	return q
+}
+
+// DistinctValues requests only distinct values for the selected Fields.
+func (q *QueryBuilder) DistinctValues() *QueryBuilder {
+	q.params.ReturnDistinctValues = true
 	return q
 }
 

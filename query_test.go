@@ -116,6 +116,29 @@ func TestBuilder_FieldsOrderGroupAndGeometry(t *testing.T) {
 	}
 }
 
+func TestBuilder_DistinctValues(t *testing.T) {
+	srv, last := newServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"features": []}`))
+	})
+
+	client := arcgis.NewClient(srv.URL)
+	_, err := client.Layer(56).Query().
+		Fields("OFC_SBRB_NAME").
+		OrderBy("OFC_SBRB_NAME").
+		DistinctValues().
+		All(context.Background())
+	if err != nil {
+		t.Fatalf("All: %v", err)
+	}
+
+	if got := last.Get("returnDistinctValues"); got != "true" {
+		t.Errorf("returnDistinctValues = %q, want %q", got, "true")
+	}
+	if got := last.Get("outFields"); got != "OFC_SBRB_NAME" {
+		t.Errorf("outFields = %q, want %q", got, "OFC_SBRB_NAME")
+	}
+}
+
 func TestWhereClauseIsEscaped(t *testing.T) {
 	// A WHERE clause with spaces, quotes and an ampersand must round-trip
 	// intact through URL encoding.
