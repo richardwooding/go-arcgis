@@ -1,3 +1,15 @@
+// Package arcgis is a small, dependency-free client for querying ArcGIS
+// Feature Services over their REST API.
+//
+// It offers two interchangeable styles: a struct-based API ([QueryParams] passed
+// to [Client.Query]) and a fluent builder ([Client.Layer] → [LayerClient.Query]).
+// Pagination, counts, and object-ID-only queries are first-class.
+//
+//	client := arcgis.NewClient(baseURL)
+//	features, err := client.Layer(7).Query().
+//		Where("STAGE = 4").
+//		Fields("NAME", "STAGE").
+//		All(ctx)
 package arcgis
 
 import (
@@ -25,21 +37,23 @@ func WithHTTPClient(hc *http.Client) ClientOption {
 	return func(c *Client) { c.httpClient = hc }
 }
 
-// WithToken sets an ArcGIS authentication token.
+// WithToken sets an ArcGIS authentication token, appended to every request.
 func WithToken(token string) ClientOption {
 	return func(c *Client) { c.token = token }
 }
 
-// WithTimeout sets a request timeout.
+// WithTimeout sets a request timeout on the default HTTP client. It has no
+// effect when combined with WithHTTPClient.
 func WithTimeout(d time.Duration) ClientOption {
 	return func(c *Client) {
 		c.httpClient = &http.Client{Timeout: d}
 	}
 }
 
-// NewClient creates a new ArcGIS Feature Service client.
-// baseURL should be the root of the FeatureServer, e.g.:
-//   https://citymaps.capetown.gov.za/agsext/rest/services/Theme_Based/Open_Data_Service/FeatureServer
+// NewClient creates a new ArcGIS Feature Service client. baseURL should be the
+// root of the FeatureServer, e.g.:
+//
+//	https://example.gov/arcgis/rest/services/Theme/Service/FeatureServer
 func NewClient(baseURL string, opts ...ClientOption) *Client {
 	c := &Client{
 		baseURL:    baseURL,
@@ -58,10 +72,19 @@ func (c *Client) Layer(id int) *LayerClient {
 
 // ServiceInfo fetches metadata about the feature service.
 func (c *Client) ServiceInfo(ctx context.Context) (*ServiceInfo, error) {
-	endpoint := fmt.Sprintf("%s?f=json", c.baseURL)
 	var info ServiceInfo
-	if err := c.get(ctx, endpoint, &info); err != nil {
-		return nil, err
+	if err := c.get(ctx, c.baseURL, url.Values{"f": {"json"}}, &info); err != nil {
+		return nil, fmt.Errorf("arcgis service info: %w", err)
+	}
+	return &info, nil
+}
+
+// LayerInfo fetches metadata for a specific layer.
+func (c *Client) LayerInfo(ctx context.Context, layerID int) (*LayerInfo, error) {
+	endpoint := fmt.Sprintf("%s/%d", c.baseURL, layerID)
+	var info LayerInfo
+	if err := c.get(ctx, endpoint, url.Values{"f": {"json"}}, &info); err != nil {
+		return nil, fmt.Errorf("arcgis layer %d info: %w", layerID, err)
 	}
 	return &info, nil
 }
@@ -69,12 +92,8 @@ func (c *Client) ServiceInfo(ctx context.Context) (*ServiceInfo, error) {
 // Query executes a single-page query and returns the raw FeatureSet.
 func (c *Client) Query(ctx context.Context, p QueryParams) (*FeatureSet, error) {
 	p.defaults()
-	endpoint := fmt.Sprintf("%s/%d/query?%s", c.baseURL, p.LayerID, p.toQueryString())
-	if c.token != "" {
-		endpoint += "&token=" + url.QueryEscape(c.token)
-	}
 	var fs FeatureSet
-	if err := c.get(ctx, endpoint, &fs); err != nil {
+	if err := c.get(ctx, c.queryEndpoint(p), p.values(), &fs); err != nil {
 		return nil, fmt.Errorf("arcgis query layer %d: %w", p.LayerID, err)
 	}
 	return &fs, nil
@@ -102,12 +121,12 @@ func (c *Client) QueryAll(ctx context.Context, p QueryParams) ([]Feature, error)
 func (c *Client) QueryCount(ctx context.Context, p QueryParams) (int, error) {
 	p.defaults()
 	p.ReturnCountOnly = true
-	endpoint := fmt.Sprintf("%s/%d/query?%s", c.baseURL, p.LayerID, p.toQueryString())
+	p.Format = FormatJSON // count responses are Esri JSON only
 	var result struct {
 		Count int `json:"count"`
 	}
-	if err := c.get(ctx, endpoint, &result); err != nil {
-		return 0, err
+	if err := c.get(ctx, c.queryEndpoint(p), p.values(), &result); err != nil {
+		return 0, fmt.Errorf("arcgis count layer %d: %w", p.LayerID, err)
 	}
 	return result.Count, nil
 }
@@ -115,31 +134,28 @@ func (c *Client) QueryCount(ctx context.Context, p QueryParams) (int, error) {
 // QueryIDs returns all object IDs matching the query.
 func (c *Client) QueryIDs(ctx context.Context, p QueryParams) ([]int64, error) {
 	p.defaults()
-	p.ReturnIdsOnly = true
-	endpoint := fmt.Sprintf("%s/%d/query?%s", c.baseURL, p.LayerID, p.toQueryString())
+	p.ReturnIDsOnly = true
+	p.Format = FormatJSON // ID responses are Esri JSON only
 	var result struct {
 		ObjectIDs []int64 `json:"objectIds"`
 	}
-	if err := c.get(ctx, endpoint, &result); err != nil {
-		return nil, err
+	if err := c.get(ctx, c.queryEndpoint(p), p.values(), &result); err != nil {
+		return nil, fmt.Errorf("arcgis ids layer %d: %w", p.LayerID, err)
 	}
 	return result.ObjectIDs, nil
 }
 
-// LayerInfo fetches metadata for a specific layer.
-func (c *Client) LayerInfo(ctx context.Context, layerID int) (*LayerInfo, error) {
-	endpoint := fmt.Sprintf("%s/%d?f=json", c.baseURL, layerID)
-	var info LayerInfo
-	if err := c.get(ctx, endpoint, &info); err != nil {
-		return nil, err
-	}
-	return &info, nil
-}
-
 // --- internal ---
 
-func (c *Client) get(ctx context.Context, endpoint string, out interface{}) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+func (c *Client) queryEndpoint(p QueryParams) string {
+	return fmt.Sprintf("%s/%d/query", c.baseURL, p.LayerID)
+}
+
+func (c *Client) get(ctx context.Context, endpoint string, params url.Values, out any) error {
+	if c.token != "" {
+		params.Set("token", c.token)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+params.Encode(), http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -147,13 +163,35 @@ func (c *Client) get(ctx context.Context, endpoint string, out interface{}) erro
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, truncate(body, 4096))
 	}
-	return json.NewDecoder(resp.Body).Decode(out)
+
+	// ArcGIS often reports failures with HTTP 200 and an error envelope.
+	var env errorEnvelope
+	if json.Unmarshal(body, &env) == nil && env.Error != nil {
+		return env.Error
+	}
+
+	if err := json.Unmarshal(body, out); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+	return nil
+}
+
+// truncate renders up to n bytes of body for inclusion in an error message.
+func truncate(body []byte, n int) string {
+	if len(body) > n {
+		return string(body[:n])
+	}
+	return string(body)
 }
 
 // --- LayerClient ---

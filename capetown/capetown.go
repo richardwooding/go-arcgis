@@ -2,6 +2,10 @@
 // for the City of Cape Town Open Data Portal.
 //
 // Base URL: https://citymaps.capetown.gov.za/agsext/rest/services/Theme_Based/Open_Data_Service/FeatureServer
+//
+// The layer IDs below are best-effort and may drift as the upstream service
+// is republished. Use a [github.com/richardwooding/go-arcgis.Client] with
+// ServiceInfo to confirm them against the live service.
 package capetown
 
 import (
@@ -16,7 +20,7 @@ const BaseURL = "https://citymaps.capetown.gov.za/agsext/rest/services/Theme_Bas
 // Layer IDs for well-known CCT datasets.
 const (
 	LayerLoadSheddingBlocks = 111
-	LayerServiceRequests    = 1   // placeholder — verify against live service
+	LayerServiceRequests    = 1 // placeholder — verify against live service
 	LayerWards              = 64
 	LayerLandParcels        = 56
 	LayerTaxiRoutes         = 108
@@ -24,6 +28,9 @@ const (
 	LayerWaterQuality       = 229
 	LayerHeritageInventory  = 49
 )
+
+// fieldSuburb is the suburb attribute name shared by several datasets.
+const fieldSuburb = "SUBURB"
 
 // --- Load Shedding ---
 
@@ -37,32 +44,27 @@ func LoadSheddingBlocks() arcgis.QueryParams {
 
 // LoadSheddingBlocksForStage returns zones for a specific load shedding stage (1–8).
 func LoadSheddingBlocksForStage(stage int) arcgis.QueryParams {
-	return arcgis.QueryParams{
-		LayerID: LayerLoadSheddingBlocks,
-		Where:   fmt.Sprintf("STAGE = %d", stage),
-		Fields:  []string{"BLOCK_NAME", "STAGE", "SUBURB_NAME"},
-	}
+	p := LoadSheddingBlocks()
+	p.Where = fmt.Sprintf("STAGE = %d", stage)
+	return p
 }
 
 // --- Service Requests ---
 
-// ServiceRequests returns open service requests.
+// ServiceRequests returns open service requests, most recent first.
 func ServiceRequests() arcgis.QueryParams {
 	return arcgis.QueryParams{
-		LayerID: LayerServiceRequests,
-		Fields:  []string{"SR_NUMBER", "DESCRIPTION", "STATUS", "SUBURB", "CREATED_DATE"},
+		LayerID:       LayerServiceRequests,
+		Fields:        []string{"SR_NUMBER", "DESCRIPTION", "STATUS", fieldSuburb, "CREATED_DATE"},
 		OrderByFields: []string{"CREATED_DATE DESC"},
 	}
 }
 
 // ServiceRequestsBySuburb filters service requests by suburb name.
 func ServiceRequestsBySuburb(suburb string) arcgis.QueryParams {
-	return arcgis.QueryParams{
-		LayerID: LayerServiceRequests,
-		Where:   fmt.Sprintf("SUBURB = '%s'", suburb),
-		Fields:  []string{"SR_NUMBER", "DESCRIPTION", "STATUS", "SUBURB", "CREATED_DATE"},
-		OrderByFields: []string{"CREATED_DATE DESC"},
-	}
+	p := ServiceRequests()
+	p.Where = fmt.Sprintf("%s = '%s'", fieldSuburb, suburb)
+	return p
 }
 
 // --- Wards ---
@@ -81,7 +83,7 @@ func Wards() arcgis.QueryParams {
 func LandParcels() arcgis.QueryParams {
 	return arcgis.QueryParams{
 		LayerID: LayerLandParcels,
-		Fields:  []string{"ERF_NO", "LEGAL_STATUS", "SUBURB", "AREA_SQM"},
+		Fields:  []string{"ERF_NO", "LEGAL_STATUS", fieldSuburb, "AREA_SQM"},
 	}
 }
 
@@ -97,11 +99,11 @@ func TaxiRoutes() arcgis.QueryParams {
 
 // --- Water ---
 
-// WaterQualityResults returns inland water quality measurements.
+// WaterQualityResults returns inland water quality measurements, most recent first.
 func WaterQualityResults() arcgis.QueryParams {
 	return arcgis.QueryParams{
-		LayerID: LayerWaterQuality,
-		Fields:  []string{"SITE_NAME", "SAMPLE_DATE", "PARAMETER", "RESULT", "UNIT"},
+		LayerID:       LayerWaterQuality,
+		Fields:        []string{"SITE_NAME", "SAMPLE_DATE", "PARAMETER", "RESULT", "UNIT"},
 		OrderByFields: []string{"SAMPLE_DATE DESC"},
 	}
 }

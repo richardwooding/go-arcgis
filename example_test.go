@@ -88,6 +88,8 @@ func Example_countOnly() {
 }
 
 func Example_inspectParams() {
+	client := arcgis.NewClient(capetown.BaseURL)
+
 	// QueryParams is just a struct — inspect, log, or marshal it
 	p := client.Layer(capetown.LayerWards).
 		Query().

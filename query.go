@@ -2,7 +2,8 @@ package arcgis
 
 import (
 	"context"
-	"fmt"
+	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -10,29 +11,38 @@ import (
 type OutputFormat string
 
 const (
+	// FormatGeoJSON requests RFC 7946 GeoJSON. Each feature carries its
+	// attributes under "properties".
 	FormatGeoJSON OutputFormat = "geojson"
-	FormatJSON    OutputFormat = "json"
-	FormatPBF     OutputFormat = "pbf"
+	// FormatJSON requests Esri JSON. Each feature carries its attributes
+	// under "attributes".
+	FormatJSON OutputFormat = "json"
+	// FormatPBF requests the Protocol Buffer encoding. This package decodes
+	// JSON responses only; use FormatPBF only with a custom decoder.
+	FormatPBF OutputFormat = "pbf"
 )
 
 // QueryParams defines all parameters for an ArcGIS feature query.
 // It can be used directly (struct-style) or built via QueryBuilder (fluent-style).
+//
+// The zero value is usable: defaults are applied for an unset Where clause
+// ("1=1"), Format (GeoJSON), and PageSize (1000).
 type QueryParams struct {
-	LayerID          int
-	Where            string
-	Fields           []string
-	Envelope         *Envelope
-	Geometry         *Point
-	GeometryType     GeometryType
-	SpatialRel       SpatialRel
-	OrderByFields    []string
-	GroupByFields    []string
-	ResultOffset     int
-	PageSize         int
-	ReturnGeometry   *bool // nil = server default (true)
-	ReturnIdsOnly    bool
-	ReturnCountOnly  bool
-	Format           OutputFormat
+	LayerID         int
+	Where           string
+	Fields          []string
+	Envelope        *Envelope
+	Geometry        *Point
+	GeometryType    GeometryType
+	SpatialRel      SpatialRel
+	OrderByFields   []string
+	GroupByFields   []string
+	ResultOffset    int
+	PageSize        int
+	ReturnGeometry  *bool // nil = server default (true)
+	ReturnIDsOnly   bool
+	ReturnCountOnly bool
+	Format          OutputFormat
 }
 
 // defaults applies sensible defaults to unset fields.
@@ -43,8 +53,13 @@ func (p *QueryParams) defaults() {
 	if p.Format == "" {
 		p.Format = FormatGeoJSON
 	}
-	if p.GeometryType == "" && p.Envelope != nil {
-		p.GeometryType = GeometryTypeEnvelope
+	if p.GeometryType == "" {
+		switch {
+		case p.Envelope != nil:
+			p.GeometryType = GeometryTypeEnvelope
+		case p.Geometry != nil:
+			p.GeometryType = GeometryTypePoint
+		}
 	}
 	if p.SpatialRel == "" && (p.Envelope != nil || p.Geometry != nil) {
 		p.SpatialRel = SpatialRelIntersects
@@ -54,45 +69,49 @@ func (p *QueryParams) defaults() {
 	}
 }
 
-// toQueryString converts QueryParams to ArcGIS REST query parameters.
-func (p QueryParams) toQueryString() string {
-	params := []string{
-		fmt.Sprintf("f=%s", p.Format),
-		fmt.Sprintf("where=%s", p.Where),
-		fmt.Sprintf("resultOffset=%d", p.ResultOffset),
-		fmt.Sprintf("resultRecordCount=%d", p.PageSize),
-	}
+// values converts QueryParams to escaped ArcGIS REST query parameters.
+func (p QueryParams) values() url.Values {
+	v := url.Values{}
+	v.Set("f", string(p.Format))
+	v.Set("where", p.Where)
+	v.Set("resultOffset", strconv.Itoa(p.ResultOffset))
+	v.Set("resultRecordCount", strconv.Itoa(p.PageSize))
 
 	if len(p.Fields) > 0 {
-		params = append(params, fmt.Sprintf("outFields=%s", strings.Join(p.Fields, ",")))
+		v.Set("outFields", strings.Join(p.Fields, ","))
 	} else {
-		params = append(params, "outFields=*")
+		v.Set("outFields", "*")
 	}
 
-	if p.Envelope != nil {
-		geom := fmt.Sprintf("%f,%f,%f,%f", p.Envelope.MinX, p.Envelope.MinY, p.Envelope.MaxX, p.Envelope.MaxY)
-		params = append(params,
-			fmt.Sprintf("geometry=%s", geom),
-			fmt.Sprintf("geometryType=%s", p.GeometryType),
-			fmt.Sprintf("spatialRel=%s", p.SpatialRel),
-		)
+	switch {
+	case p.Envelope != nil:
+		v.Set("geometry", p.Envelope.bbox())
+		v.Set("geometryType", string(p.GeometryType))
+		v.Set("spatialRel", string(p.SpatialRel))
+	case p.Geometry != nil:
+		v.Set("geometry", p.Geometry.coords())
+		v.Set("geometryType", string(p.GeometryType))
+		v.Set("spatialRel", string(p.SpatialRel))
 	}
 
 	if len(p.OrderByFields) > 0 {
-		params = append(params, fmt.Sprintf("orderByFields=%s", strings.Join(p.OrderByFields, ",")))
+		v.Set("orderByFields", strings.Join(p.OrderByFields, ","))
+	}
+	if len(p.GroupByFields) > 0 {
+		v.Set("groupByFieldsForStatistics", strings.Join(p.GroupByFields, ","))
 	}
 
-	if p.ReturnIdsOnly {
-		params = append(params, "returnIdsOnly=true")
+	if p.ReturnIDsOnly {
+		v.Set("returnIdsOnly", "true")
 	}
 	if p.ReturnCountOnly {
-		params = append(params, "returnCountOnly=true")
+		v.Set("returnCountOnly", "true")
 	}
 	if p.ReturnGeometry != nil && !*p.ReturnGeometry {
-		params = append(params, "returnGeometry=false")
+		v.Set("returnGeometry", "false")
 	}
 
-	return strings.Join(params, "&")
+	return v
 }
 
 // --- Fluent QueryBuilder ---
@@ -115,15 +134,40 @@ func (q *QueryBuilder) Fields(fields ...string) *QueryBuilder {
 	return q
 }
 
-// WithinEnvelope sets a bounding box spatial filter.
+// WithinEnvelope sets a bounding-box spatial filter.
 func (q *QueryBuilder) WithinEnvelope(minX, minY, maxX, maxY float64) *QueryBuilder {
 	q.params.Envelope = &Envelope{MinX: minX, MinY: minY, MaxX: maxX, MaxY: maxY}
+	return q
+}
+
+// IntersectsPoint sets a point spatial filter using the default
+// "intersects" relationship.
+func (q *QueryBuilder) IntersectsPoint(x, y float64) *QueryBuilder {
+	q.params.Geometry = &Point{X: x, Y: y}
+	return q
+}
+
+// SpatialRel overrides the spatial relationship applied to the geometry filter.
+func (q *QueryBuilder) SpatialRel(rel SpatialRel) *QueryBuilder {
+	q.params.SpatialRel = rel
 	return q
 }
 
 // OrderBy sets the ORDER BY fields.
 func (q *QueryBuilder) OrderBy(fields ...string) *QueryBuilder {
 	q.params.OrderByFields = fields
+	return q
+}
+
+// GroupBy sets the GROUP BY fields (used with statistics queries).
+func (q *QueryBuilder) GroupBy(fields ...string) *QueryBuilder {
+	q.params.GroupByFields = fields
+	return q
+}
+
+// Offset sets the starting record offset for pagination.
+func (q *QueryBuilder) Offset(n int) *QueryBuilder {
+	q.params.ResultOffset = n
 	return q
 }
 
@@ -146,9 +190,9 @@ func (q *QueryBuilder) Format(f OutputFormat) *QueryBuilder {
 	return q
 }
 
-// From merges a pre-built QueryParams into this builder (useful for CCT named queries).
+// From merges a pre-built QueryParams into this builder (useful for named queries).
+// The layer ID set by Layer() is preserved.
 func (q *QueryBuilder) From(base QueryParams) *QueryBuilder {
-	// Preserve the layerID set by Layer(), merge everything else
 	layerID := q.params.LayerID
 	q.params = base
 	q.params.LayerID = layerID
@@ -162,26 +206,20 @@ func (q *QueryBuilder) Params() QueryParams {
 
 // First fetches only the first page of results.
 func (q *QueryBuilder) First(ctx context.Context) (*FeatureSet, error) {
-	q.params.defaults()
 	return q.client.Query(ctx, q.params)
 }
 
 // All fetches all results, handling pagination automatically.
 func (q *QueryBuilder) All(ctx context.Context) ([]Feature, error) {
-	q.params.defaults()
 	return q.client.QueryAll(ctx, q.params)
 }
 
 // Count returns only the record count matching the query.
 func (q *QueryBuilder) Count(ctx context.Context) (int, error) {
-	q.params.defaults()
-	q.params.ReturnCountOnly = true
 	return q.client.QueryCount(ctx, q.params)
 }
 
 // IDs returns only the object IDs matching the query.
 func (q *QueryBuilder) IDs(ctx context.Context) ([]int64, error) {
-	q.params.defaults()
-	q.params.ReturnIdsOnly = true
 	return q.client.QueryIDs(ctx, q.params)
 }
