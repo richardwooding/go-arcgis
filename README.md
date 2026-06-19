@@ -124,25 +124,29 @@ if errors.As(err, &apiErr) {
 }
 ```
 
-## City of Cape Town
+## Named services
 
-The `capetown` subpackage ships named layer IDs and pre-built queries for the
-City of Cape Town Open Data Portal:
+Build named layer IDs and pre-built `QueryParams` for a specific service, then
+extend them at the call site with `.From(...)`:
 
 ```go
-import "github.com/richardwooding/go-arcgis/capetown"
+func loadSheddingForStage(stage int) arcgis.QueryParams {
+    return arcgis.QueryParams{
+        LayerID: 111,
+        Where:   fmt.Sprintf("STAGE = %d", stage),
+        Fields:  []string{"BLOCK_NAME", "STAGE"},
+    }
+}
 
-client := arcgis.NewClient(capetown.BaseURL)
-
-// Pre-built, optionally refined
-features, err := client.Layer(capetown.LayerLoadSheddingBlocks).Query().
-    From(capetown.LoadSheddingBlocksForStage(4)).
+features, err := client.Layer(111).Query().
+    From(loadSheddingForStage(4)).
     WithinEnvelope(18.4, -34.0, 18.6, -33.8).
     All(ctx)
 ```
 
-Layer IDs there are best-effort; verify them against the live service with
-`Client.ServiceInfo` if accuracy matters.
+For the City of Cape Town Open Data Portal, the companion package
+[`capetown-opendata`](https://github.com/richardwooding/capetown-opendata)
+ships these constructors and verified layer IDs ready to use.
 
 ## Changelog
 

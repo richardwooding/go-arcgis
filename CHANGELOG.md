@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+- The `capetown` subpackage has moved to its own module,
+  [`capetown-opendata`](https://github.com/richardwooding/capetown-opendata).
+  Import `github.com/richardwooding/capetown-opendata` instead of
+  `github.com/richardwooding/go-arcgis/capetown`.
+
 ## [0.1.0] - 2026-06-19
 
 Initial release.
@@ -26,4 +34,5 @@ Initial release.
 - `capetown` subpackage with named layer IDs and pre-built `QueryParams` for the
   City of Cape Town Open Data Portal.
 
+[Unreleased]: https://github.com/richardwooding/go-arcgis/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/richardwooding/go-arcgis/releases/tag/v0.1.0
