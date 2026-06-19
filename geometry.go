@@ -5,6 +5,47 @@ import (
 	"strings"
 )
 
+// Polygon is a polygon spatial filter, expressed as one or more linear rings of
+// [x, y] coordinates in the layer's coordinate system (typically WGS84
+// longitude/latitude). Per the Esri convention an exterior ring is clockwise
+// and holes are counter-clockwise, but ArcGIS query filters tolerate either.
+type Polygon struct {
+	Rings [][][]float64
+}
+
+// esriJSON renders the polygon as the Esri JSON geometry string ArcGIS accepts
+// for a polygon filter: {"rings":[[[x,y],...],...]}.
+func (p Polygon) esriJSON() string {
+	var b strings.Builder
+	b.WriteString(`{"rings":[`)
+	for i, ring := range p.Rings {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteByte('[')
+		for j, pt := range ring {
+			if j > 0 {
+				b.WriteByte(',')
+			}
+			x, y := 0.0, 0.0
+			if len(pt) > 0 {
+				x = pt[0]
+			}
+			if len(pt) > 1 {
+				y = pt[1]
+			}
+			b.WriteByte('[')
+			b.WriteString(formatFloat(x))
+			b.WriteByte(',')
+			b.WriteString(formatFloat(y))
+			b.WriteByte(']')
+		}
+		b.WriteByte(']')
+	}
+	b.WriteString(`]}`)
+	return b.String()
+}
+
 // Envelope is a bounding-box spatial filter, expressed in the layer's
 // coordinate system (typically WGS84 longitude/latitude).
 type Envelope struct {
