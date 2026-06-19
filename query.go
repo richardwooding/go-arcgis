@@ -28,13 +28,21 @@ const (
 // The zero value is usable: defaults are applied for an unset Where clause
 // ("1=1"), Format (GeoJSON), and PageSize (1000).
 type QueryParams struct {
-	LayerID         int
-	Where           string
-	Fields          []string
-	Envelope        *Envelope
-	Geometry        *Point
-	GeometryType    GeometryType
-	SpatialRel      SpatialRel
+	LayerID      int
+	Where        string
+	Fields       []string
+	Envelope     *Envelope
+	Geometry     *Point
+	Polygon      *Polygon
+	GeometryType GeometryType
+	SpatialRel   SpatialRel
+	// InSR is the well-known ID of the spatial reference the input geometry
+	// (Envelope/Geometry/Polygon) is expressed in. When zero and a geometry
+	// filter is set, it defaults to 4326 (WGS84 longitude/latitude) — the SR
+	// of the coordinates callers normally supply. Without it, ArcGIS assumes
+	// the geometry is in the layer's native SR, so a WGS84 box silently
+	// matches nothing against a layer stored in Web Mercator.
+	InSR            int
 	OrderByFields   []string
 	GroupByFields   []string
 	ResultOffset    int
@@ -47,6 +55,11 @@ type QueryParams struct {
 	// enumerate the values present in one or more columns.
 	ReturnDistinctValues bool
 	Format               OutputFormat
+}
+
+// hasGeometryFilter reports whether any spatial filter geometry is set.
+func (p QueryParams) hasGeometryFilter() bool {
+	return p.Envelope != nil || p.Geometry != nil || p.Polygon != nil
 }
 
 // defaults applies sensible defaults to unset fields.
@@ -63,10 +76,15 @@ func (p *QueryParams) defaults() {
 			p.GeometryType = GeometryTypeEnvelope
 		case p.Geometry != nil:
 			p.GeometryType = GeometryTypePoint
+		case p.Polygon != nil:
+			p.GeometryType = GeometryTypePolygon
 		}
 	}
-	if p.SpatialRel == "" && (p.Envelope != nil || p.Geometry != nil) {
+	if p.SpatialRel == "" && p.hasGeometryFilter() {
 		p.SpatialRel = SpatialRelIntersects
+	}
+	if p.InSR == 0 && p.hasGeometryFilter() {
+		p.InSR = 4326
 	}
 	if p.PageSize == 0 {
 		p.PageSize = 1000
@@ -96,6 +114,13 @@ func (p QueryParams) values() url.Values {
 		v.Set("geometry", p.Geometry.coords())
 		v.Set("geometryType", string(p.GeometryType))
 		v.Set("spatialRel", string(p.SpatialRel))
+	case p.Polygon != nil:
+		v.Set("geometry", p.Polygon.esriJSON())
+		v.Set("geometryType", string(p.GeometryType))
+		v.Set("spatialRel", string(p.SpatialRel))
+	}
+	if p.InSR != 0 && p.hasGeometryFilter() {
+		v.Set("inSR", strconv.Itoa(p.InSR))
 	}
 
 	if len(p.OrderByFields) > 0 {
@@ -144,6 +169,18 @@ func (q *QueryBuilder) Fields(fields ...string) *QueryBuilder {
 // WithinEnvelope sets a bounding-box spatial filter.
 func (q *QueryBuilder) WithinEnvelope(minX, minY, maxX, maxY float64) *QueryBuilder {
 	q.params.Envelope = &Envelope{MinX: minX, MinY: minY, MaxX: maxX, MaxY: maxY}
+	return q
+}
+
+// WithinPolygon sets a polygon spatial filter from one or more [x, y] rings.
+func (q *QueryBuilder) WithinPolygon(rings [][][]float64) *QueryBuilder {
+	q.params.Polygon = &Polygon{Rings: rings}
+	return q
+}
+
+// InSR sets the spatial reference (well-known ID) of the input filter geometry.
+func (q *QueryBuilder) InSR(wkid int) *QueryBuilder {
+	q.params.InSR = wkid
 	return q
 }
 

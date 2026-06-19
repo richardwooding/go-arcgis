@@ -3,6 +3,7 @@ package arcgis_test
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 
 	arcgis "github.com/richardwooding/go-arcgis"
@@ -136,6 +137,61 @@ func TestBuilder_DistinctValues(t *testing.T) {
 	}
 	if got := last.Get("outFields"); got != "OFC_SBRB_NAME" {
 		t.Errorf("outFields = %q, want %q", got, "OFC_SBRB_NAME")
+	}
+}
+
+func TestEnvelopeDefaultsToWGS84InSR(t *testing.T) {
+	// A bbox supplied in degrees must be tagged inSR=4326, else a layer stored
+	// in another SR (e.g. Web Mercator) interprets the degrees as its own units
+	// and matches nothing.
+	srv, last := newServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"features": []}`))
+	})
+	client := arcgis.NewClient(srv.URL)
+	_, err := client.Query(context.Background(), arcgis.QueryParams{
+		LayerID:  3,
+		Envelope: &arcgis.Envelope{MinX: 18.38, MinY: -33.98, MaxX: 18.44, MaxY: -33.91},
+	})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if got := last.Get("inSR"); got != "4326" {
+		t.Errorf("inSR = %q, want %q", got, "4326")
+	}
+}
+
+func TestNoInSRWithoutGeometry(t *testing.T) {
+	srv, last := newServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"features": []}`))
+	})
+	client := arcgis.NewClient(srv.URL)
+	if _, err := client.Query(context.Background(), arcgis.QueryParams{LayerID: 7}); err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if got := last.Get("inSR"); got != "" {
+		t.Errorf("inSR should be unset without a geometry filter, got %q", got)
+	}
+}
+
+func TestPolygonFilter(t *testing.T) {
+	srv, last := newServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"features": []}`))
+	})
+	client := arcgis.NewClient(srv.URL)
+	rings := [][][]float64{{{18.4, -33.9}, {18.5, -33.9}, {18.5, -34.0}, {18.4, -33.9}}}
+	_, err := client.Layer(56).Query().WithinPolygon(rings).All(context.Background())
+	if err != nil {
+		t.Fatalf("All: %v", err)
+	}
+	if got := last.Get("geometryType"); got != "esriGeometryPolygon" {
+		t.Errorf("geometryType = %q, want esriGeometryPolygon", got)
+	}
+	if got := last.Get("inSR"); got != "4326" {
+		t.Errorf("inSR = %q, want 4326", got)
+	}
+	g := last.Get("geometry")
+	if !strings.Contains(g, `"rings"`) || !strings.Contains(g, "18.4") {
+		t.Errorf("geometry JSON = %q, want it to contain rings and coordinates", g)
 	}
 }
 
