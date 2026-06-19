@@ -2,7 +2,9 @@ package arcgis_test
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -192,6 +194,49 @@ func TestPolygonFilter(t *testing.T) {
 	g := last.Get("geometry")
 	if !strings.Contains(g, `"rings"`) || !strings.Contains(g, "18.4") {
 		t.Errorf("geometry JSON = %q, want it to contain rings and coordinates", g)
+	}
+}
+
+func TestLargeQueryUsesPOST(t *testing.T) {
+	var method, body string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method = r.Method
+		b, _ := io.ReadAll(r.Body)
+		body = string(b)
+		_, _ = w.Write([]byte(`{"features": []}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	// A polygon with many vertices makes the encoded query exceed the GET limit.
+	ring := make([][]float64, 0, 400)
+	for i := 0; i < 400; i++ {
+		ring = append(ring, []float64{18.4 + float64(i)*0.0001, -33.9 - float64(i)*0.0001})
+	}
+	client := arcgis.NewClient(srv.URL)
+	if _, err := client.Layer(3).Query().WithinPolygon([][][]float64{ring}).All(context.Background()); err != nil {
+		t.Fatalf("All: %v", err)
+	}
+	if method != http.MethodPost {
+		t.Fatalf("large query should use POST, got %s", method)
+	}
+	if !strings.Contains(body, "geometryType=esriGeometryPolygon") || !strings.Contains(body, "inSR=4326") {
+		t.Fatalf("POST body missing expected params: %q", body)
+	}
+}
+
+func TestSmallQueryUsesGET(t *testing.T) {
+	var method string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method = r.Method
+		_, _ = w.Write([]byte(`{"features": []}`))
+	}))
+	t.Cleanup(srv.Close)
+	client := arcgis.NewClient(srv.URL)
+	if _, err := client.Query(context.Background(), arcgis.QueryParams{LayerID: 7, Where: "OBJECTID > 1"}); err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if method != http.MethodGet {
+		t.Fatalf("small query should use GET, got %s", method)
 	}
 }
 

@@ -19,8 +19,16 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
+
+// maxQueryStringLen is the encoded-parameter length above which requests are
+// sent as POST instead of GET. A query carrying a detailed geometry (e.g. a
+// ward or suburb polygon with hundreds of vertices) easily exceeds typical
+// server URL-length limits (~2048), which manifests as an HTTP 404. ArcGIS REST
+// endpoints accept the same parameters by GET or POST, so we fall back to POST.
+const maxQueryStringLen = 1800
 
 // Client is the main entry point for interacting with an ArcGIS Feature Service.
 type Client struct {
@@ -155,7 +163,7 @@ func (c *Client) get(ctx context.Context, endpoint string, params url.Values, ou
 	if c.token != "" {
 		params.Set("token", c.token)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+params.Encode(), http.NoBody)
+	req, err := c.newRequest(ctx, endpoint, params)
 	if err != nil {
 		return err
 	}
@@ -184,6 +192,22 @@ func (c *Client) get(ctx context.Context, endpoint string, params url.Values, ou
 		return fmt.Errorf("decode response: %w", err)
 	}
 	return nil
+}
+
+// newRequest builds a GET request, falling back to a POST with a form-encoded
+// body when the query string is large enough to risk exceeding server
+// URL-length limits (e.g. a query carrying a detailed polygon geometry).
+func (c *Client) newRequest(ctx context.Context, endpoint string, params url.Values) (*http.Request, error) {
+	encoded := params.Encode()
+	if len(encoded) <= maxQueryStringLen {
+		return http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+encoded, http.NoBody)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(encoded))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return req, nil
 }
 
 // truncate renders up to n bytes of body for inclusion in an error message.
