@@ -148,6 +148,12 @@ For the City of Cape Town Open Data Portal, the companion package
 [`capetown-opendata`](https://github.com/richardwooding/capetown-opendata)
 ships these constructors and verified layer IDs ready to use.
 
+## Ports
+
+A PHP port that tracks this library's design is available:
+[php-arcgis](https://github.com/richardwooding/php-arcgis)
+(`composer require richardwooding/arcgis`).
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md).
