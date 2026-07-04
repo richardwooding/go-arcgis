@@ -4,6 +4,8 @@
 [![Go](https://github.com/richardwooding/go-arcgis/actions/workflows/go.yml/badge.svg)](https://github.com/richardwooding/go-arcgis/actions/workflows/go.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+**Website:** [richardwooding.github.io/go-arcgis](https://richardwooding.github.io/go-arcgis/)
+
 A small, dependency-free Go client for querying **ArcGIS Feature Services**
 over their REST API. It handles pagination, counts, and object-ID-only
 queries, and offers two interchangeable styles: a plain struct API and a fluent
