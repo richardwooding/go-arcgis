@@ -209,7 +209,7 @@ func TestLargeQueryUsesPOST(t *testing.T) {
 
 	// A polygon with many vertices makes the encoded query exceed the GET limit.
 	ring := make([][]float64, 0, 400)
-	for i := 0; i < 400; i++ {
+	for i := range 400 {
 		ring = append(ring, []float64{18.4 + float64(i)*0.0001, -33.9 - float64(i)*0.0001})
 	}
 	client := arcgis.NewClient(srv.URL)
