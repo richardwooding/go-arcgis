@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-05
+
+### Added
+- Server-side statistics: `QueryParams.OutStatistics` and
+  `QueryBuilder.Statistics(...)`, with `Statistic` and the `StatCount`,
+  `StatSum`, `StatAvg`, `StatMin`, `StatMax`, `StatStddev` and `StatVar`
+  aggregates. Combine with `GroupBy`; statistics responses are always Esri JSON.
+- `ItemURL(ctx, portalURL, itemID)` resolves a portal item ID to its current
+  service URL, with `ArcGISOnline` as the public portal. Hosted datasets are
+  often republished under new service names while keeping their item ID.
+
 ## [0.3.0] - 2026-09-08
 
 ### Changed
@@ -64,7 +75,8 @@ Initial release.
 - `capetown` subpackage with named layer IDs and pre-built `QueryParams` for the
   City of Cape Town Open Data Portal.
 
-[Unreleased]: https://github.com/richardwooding/go-arcgis/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/richardwooding/go-arcgis/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/richardwooding/go-arcgis/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/richardwooding/go-arcgis/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/richardwooding/go-arcgis/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/richardwooding/go-arcgis/compare/v0.1.1...v0.2.0

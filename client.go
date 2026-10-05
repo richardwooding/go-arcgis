@@ -81,7 +81,7 @@ func (c *Client) Layer(id int) *LayerClient {
 // ServiceInfo fetches metadata about the feature service.
 func (c *Client) ServiceInfo(ctx context.Context) (*ServiceInfo, error) {
 	var info ServiceInfo
-	if err := c.get(ctx, c.baseURL, url.Values{"f": {"json"}}, &info); err != nil {
+	if err := c.get(ctx, c.baseURL, url.Values{"f": {string(FormatJSON)}}, &info); err != nil {
 		return nil, fmt.Errorf("arcgis service info: %w", err)
 	}
 	return &info, nil
@@ -91,7 +91,7 @@ func (c *Client) ServiceInfo(ctx context.Context) (*ServiceInfo, error) {
 func (c *Client) LayerInfo(ctx context.Context, layerID int) (*LayerInfo, error) {
 	endpoint := fmt.Sprintf("%s/%d", c.baseURL, layerID)
 	var info LayerInfo
-	if err := c.get(ctx, endpoint, url.Values{"f": {"json"}}, &info); err != nil {
+	if err := c.get(ctx, endpoint, url.Values{"f": {string(FormatJSON)}}, &info); err != nil {
 		return nil, fmt.Errorf("arcgis layer %d info: %w", layerID, err)
 	}
 	return &info, nil

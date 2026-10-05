@@ -2,6 +2,7 @@ package arcgis
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 	"strconv"
 	"strings"
@@ -54,7 +55,31 @@ type QueryParams struct {
 	// Fields. Typically combined with Fields (and often OrderByFields) to
 	// enumerate the values present in one or more columns.
 	ReturnDistinctValues bool
-	Format               OutputFormat
+	// OutStatistics switches the query to server-side aggregation, grouped by
+	// GroupByFields; the response is always Esri JSON.
+	OutStatistics []Statistic
+	Format        OutputFormat
+}
+
+// StatisticType names an ArcGIS aggregate function.
+type StatisticType string
+
+// Supported aggregate functions for OutStatistics.
+const (
+	StatCount  StatisticType = "count"
+	StatSum    StatisticType = "sum"
+	StatAvg    StatisticType = "avg"
+	StatMin    StatisticType = "min"
+	StatMax    StatisticType = "max"
+	StatStddev StatisticType = "stddev"
+	StatVar    StatisticType = "var"
+)
+
+// Statistic is one aggregate computed by a statistics query.
+type Statistic struct {
+	Type    StatisticType `json:"statisticType"`
+	OnField string        `json:"onStatisticField"`
+	OutName string        `json:"outStatisticFieldName"`
 }
 
 // hasGeometryFilter reports whether any spatial filter geometry is set.
@@ -67,7 +92,10 @@ func (p *QueryParams) defaults() {
 	if p.Where == "" {
 		p.Where = "1=1"
 	}
-	if p.Format == "" {
+	switch {
+	case len(p.OutStatistics) > 0:
+		p.Format = FormatJSON
+	case p.Format == "":
 		p.Format = FormatGeoJSON
 	}
 	if p.GeometryType == "" {
@@ -99,9 +127,13 @@ func (p QueryParams) values() url.Values {
 	v.Set("resultOffset", strconv.Itoa(p.ResultOffset))
 	v.Set("resultRecordCount", strconv.Itoa(p.PageSize))
 
-	if len(p.Fields) > 0 {
+	switch {
+	case len(p.OutStatistics) > 0:
+		stats, _ := json.Marshal(p.OutStatistics)
+		v.Set("outStatistics", string(stats))
+	case len(p.Fields) > 0:
 		v.Set("outFields", strings.Join(p.Fields, ","))
-	} else {
+	default:
 		v.Set("outFields", "*")
 	}
 
@@ -200,6 +232,12 @@ func (q *QueryBuilder) SpatialRel(rel SpatialRel) *QueryBuilder {
 // OrderBy sets the ORDER BY fields.
 func (q *QueryBuilder) OrderBy(fields ...string) *QueryBuilder {
 	q.params.OrderByFields = fields
+	return q
+}
+
+// Statistics requests server-side aggregates; combine with GroupBy.
+func (q *QueryBuilder) Statistics(stats ...Statistic) *QueryBuilder {
+	q.params.OutStatistics = stats
 	return q
 }
 
