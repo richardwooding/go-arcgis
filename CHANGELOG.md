@@ -6,6 +6,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-08
+
+### Changed
+- Raised the minimum Go version to 1.27 and applied the Go 1.27 modernizers.
+  No API changes.
+
+### Added
+- GitHub Pages documentation site, with OpenGraph/Twitter preview metadata.
+- README links to the [php-arcgis](https://github.com/richardwooding/php-arcgis)
+  port and to sponsorship.
+
+## [0.2.1] - 2026-06-19
+
+### Fixed
+- Queries whose encoded parameters would exceed URL length limits are now sent
+  as `POST`, avoiding the 404s the ArcGIS server returns for over-long GETs.
+
+## [0.2.0] - 2026-06-19
+
+### Added
+- `QueryParams.InSR` and `QueryBuilder.InSR(wkid)` to declare the spatial
+  reference of the input geometry.
+- `Polygon` geometry and `QueryBuilder.WithinPolygon(rings)` for polygon
+  spatial filters.
+
+## [0.1.1] - 2026-06-19
+
+### Added
+- `QueryParams.ReturnDistinctValues` and `QueryBuilder.DistinctValues()`.
+
 ### Removed
 - The `capetown` subpackage has moved to its own module,
   [`capetown-opendata`](https://github.com/richardwooding/capetown-opendata).
@@ -34,5 +64,9 @@ Initial release.
 - `capetown` subpackage with named layer IDs and pre-built `QueryParams` for the
   City of Cape Town Open Data Portal.
 
-[Unreleased]: https://github.com/richardwooding/go-arcgis/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/richardwooding/go-arcgis/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/richardwooding/go-arcgis/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/richardwooding/go-arcgis/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/richardwooding/go-arcgis/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/richardwooding/go-arcgis/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/richardwooding/go-arcgis/releases/tag/v0.1.0
