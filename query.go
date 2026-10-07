@@ -55,6 +55,13 @@ type QueryParams struct {
 	// Fields. Typically combined with Fields (and often OrderByFields) to
 	// enumerate the values present in one or more columns.
 	ReturnDistinctValues bool
+	// MaxAllowableOffset asks the server to generalise returned geometries to
+	// this tolerance, in the units of the output spatial reference (degrees for
+	// GeoJSON). Zero returns full detail.
+	MaxAllowableOffset float64
+	// GeometryPrecision is the number of decimal places kept in returned
+	// coordinates. Zero leaves the server default.
+	GeometryPrecision int
 	// OutStatistics switches the query to server-side aggregation, grouped by
 	// GroupByFields; the response is always Esri JSON.
 	OutStatistics []Statistic
@@ -162,6 +169,11 @@ func (p QueryParams) values() url.Values {
 		v.Set("groupByFieldsForStatistics", strings.Join(p.GroupByFields, ","))
 	}
 
+	p.setFlags(v)
+	return v
+}
+
+func (p QueryParams) setFlags(v url.Values) {
 	if p.ReturnIDsOnly {
 		v.Set("returnIdsOnly", "true")
 	}
@@ -174,8 +186,12 @@ func (p QueryParams) values() url.Values {
 	if p.ReturnGeometry != nil && !*p.ReturnGeometry {
 		v.Set("returnGeometry", "false")
 	}
-
-	return v
+	if p.MaxAllowableOffset > 0 {
+		v.Set("maxAllowableOffset", strconv.FormatFloat(p.MaxAllowableOffset, 'f', -1, 64))
+	}
+	if p.GeometryPrecision > 0 {
+		v.Set("geometryPrecision", strconv.Itoa(p.GeometryPrecision))
+	}
 }
 
 // --- Fluent QueryBuilder ---
@@ -238,6 +254,14 @@ func (q *QueryBuilder) OrderBy(fields ...string) *QueryBuilder {
 // Statistics requests server-side aggregates; combine with GroupBy.
 func (q *QueryBuilder) Statistics(stats ...Statistic) *QueryBuilder {
 	q.params.OutStatistics = stats
+	return q
+}
+
+// Simplify generalises returned geometries to tolerance (output SR units) and
+// keeps precision decimal places in their coordinates.
+func (q *QueryBuilder) Simplify(tolerance float64, precision int) *QueryBuilder {
+	q.params.MaxAllowableOffset = tolerance
+	q.params.GeometryPrecision = precision
 	return q
 }
 

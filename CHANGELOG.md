@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-07
+
+### Added
+- `QueryParams.MaxAllowableOffset` and `QueryParams.GeometryPrecision`, sent as
+  `maxAllowableOffset` and `geometryPrecision`, plus `QueryBuilder.Simplify`.
+  The server generalises geometries before returning them, which can halve
+  polygon payloads.
+
 ## [0.4.0] - 2026-10-05
 
 ### Added
@@ -75,7 +83,8 @@ Initial release.
 - `capetown` subpackage with named layer IDs and pre-built `QueryParams` for the
   City of Cape Town Open Data Portal.
 
-[Unreleased]: https://github.com/richardwooding/go-arcgis/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/richardwooding/go-arcgis/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/richardwooding/go-arcgis/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/richardwooding/go-arcgis/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/richardwooding/go-arcgis/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/richardwooding/go-arcgis/compare/v0.2.0...v0.2.1
