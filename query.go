@@ -131,8 +131,12 @@ func (p QueryParams) values() url.Values {
 	v := url.Values{}
 	v.Set("f", string(p.Format))
 	v.Set("where", p.Where)
-	v.Set("resultOffset", strconv.Itoa(p.ResultOffset))
-	v.Set("resultRecordCount", strconv.Itoa(p.PageSize))
+	// An ungrouped statistics query returns one row, and ArcGIS Online rejects
+	// it outright if paging parameters are present.
+	if len(p.OutStatistics) == 0 || len(p.GroupByFields) > 0 {
+		v.Set("resultOffset", strconv.Itoa(p.ResultOffset))
+		v.Set("resultRecordCount", strconv.Itoa(p.PageSize))
+	}
 
 	switch {
 	case len(p.OutStatistics) > 0:

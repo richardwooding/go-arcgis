@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-10-07
+
+### Fixed
+- Ungrouped statistics queries (`OutStatistics` without `GroupByFields`) no
+  longer send `resultOffset` and `resultRecordCount`. ArcGIS Online rejects
+  such a query with "Unable to perform query" when paging parameters are
+  present.
+
 ## [0.5.1] - 2026-10-07
 
 ### Fixed
@@ -91,7 +99,8 @@ Initial release.
 - `capetown` subpackage with named layer IDs and pre-built `QueryParams` for the
   City of Cape Town Open Data Portal.
 
-[Unreleased]: https://github.com/richardwooding/go-arcgis/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/richardwooding/go-arcgis/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/richardwooding/go-arcgis/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/richardwooding/go-arcgis/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/richardwooding/go-arcgis/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/richardwooding/go-arcgis/compare/v0.3.0...v0.4.0

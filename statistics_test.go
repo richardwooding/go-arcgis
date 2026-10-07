@@ -66,3 +66,35 @@ func TestStatisticsOverridesGeoJSONFormat(t *testing.T) {
 		t.Errorf("f = %q, want json", got)
 	}
 }
+
+func TestUngroupedStatisticsOmitPaging(t *testing.T) {
+	srv, last := newServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"features":[{"attributes":{"latest":1}}]}`))
+	})
+	_, err := arcgis.NewClient(srv.URL).Query(context.Background(), arcgis.QueryParams{
+		OutStatistics: []arcgis.Statistic{{Type: arcgis.StatMax, OnField: "D", OutName: "latest"}},
+	})
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if last.Has("resultOffset") || last.Has("resultRecordCount") {
+		t.Errorf("ungrouped statistics must not send paging params: %v", *last)
+	}
+}
+
+func TestGroupedStatisticsKeepPaging(t *testing.T) {
+	srv, last := newServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"features":[]}`))
+	})
+	_, err := arcgis.NewClient(srv.URL).Query(context.Background(), arcgis.QueryParams{
+		GroupByFields: []string{"Ward"},
+		OutStatistics: []arcgis.Statistic{{Type: arcgis.StatCount, OnField: "ID", OutName: "n"}},
+		PageSize:      25,
+	})
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if last.Get("resultRecordCount") != "25" {
+		t.Errorf("grouped statistics should keep resultRecordCount, got %q", last.Get("resultRecordCount"))
+	}
+}
