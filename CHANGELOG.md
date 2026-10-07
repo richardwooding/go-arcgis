@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-07
+
+### Fixed
+- `FeatureSet` now also reads `exceededTransferLimit` from the GeoJSON
+  `properties` member, where ArcGIS Online puts it. Previously `QueryAll` and
+  callers relying on the flag stopped after the first page on ArcGIS Online
+  services; ArcGIS Enterprise, which uses the top level, was unaffected.
+
 ## [0.5.0] - 2026-10-07
 
 ### Added
@@ -83,7 +91,8 @@ Initial release.
 - `capetown` subpackage with named layer IDs and pre-built `QueryParams` for the
   City of Cape Town Open Data Portal.
 
-[Unreleased]: https://github.com/richardwooding/go-arcgis/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/richardwooding/go-arcgis/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/richardwooding/go-arcgis/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/richardwooding/go-arcgis/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/richardwooding/go-arcgis/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/richardwooding/go-arcgis/compare/v0.2.1...v0.3.0

@@ -33,6 +33,25 @@ type FeatureSet struct {
 	Fields                []Field   `json:"fields,omitempty"`
 }
 
+// UnmarshalJSON also reads exceededTransferLimit from the GeoJSON "properties"
+// member, which is where ArcGIS Online puts it; ArcGIS Enterprise puts it at
+// the top level. Missing it ends pagination after the first page.
+func (fs *FeatureSet) UnmarshalJSON(b []byte) error {
+	type plain FeatureSet
+	var aux struct {
+		plain
+		Properties struct {
+			ExceededTransferLimit bool `json:"exceededTransferLimit"`
+		} `json:"properties"`
+	}
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+	*fs = FeatureSet(aux.plain)
+	fs.ExceededTransferLimit = fs.ExceededTransferLimit || aux.Properties.ExceededTransferLimit
+	return nil
+}
+
 // Field describes a single attribute field in a layer.
 type Field struct {
 	Name  string `json:"name"`

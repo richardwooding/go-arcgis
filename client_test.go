@@ -281,3 +281,22 @@ func TestWithTimeout(t *testing.T) {
 		t.Fatal("expected timeout error, got nil")
 	}
 }
+
+func TestGeoJSONExceededTransferLimitInProperties(t *testing.T) {
+	calls := 0
+	srv, _ := newServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		if calls == 1 {
+			_, _ = w.Write([]byte(`{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"ID":1}}],"properties":{"exceededTransferLimit":true}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"ID":2}}]}`))
+	})
+	all, err := arcgis.NewClient(srv.URL).QueryAll(context.Background(), arcgis.QueryParams{LayerID: 0})
+	if err != nil {
+		t.Fatalf("QueryAll: %v", err)
+	}
+	if len(all) != 2 || calls != 2 {
+		t.Errorf("got %d features over %d calls, want 2 over 2 (ArcGIS Online flags more rows under properties)", len(all), calls)
+	}
+}
