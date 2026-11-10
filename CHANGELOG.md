@@ -6,6 +6,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-10
+
+### Added
+- `Item` and `ItemInfo(ctx, portalURL, itemID)`, returning a portal item's
+  title, snippet, description, tags, type, service URL, licence text and
+  created/modified times (`Item.ModifiedTime`, `Item.CreatedTime`). Hosted
+  datasets are republished under date-stamped service names that go stale,
+  while the item's title and modified time stay accurate; callers that label
+  or date a dataset should read them from the item. `ItemURL` is now a thin
+  wrapper over `ItemInfo` with unchanged behaviour. `php-arcgis` should mirror
+  this.
+
+### Changed
+- The README and golangci-lint config now agree with `go.mod` on Go 1.27.
+
 ## [0.5.2] - 2026-10-07
 
 ### Fixed
@@ -100,6 +115,7 @@ Initial release.
   City of Cape Town Open Data Portal.
 
 [Unreleased]: https://github.com/richardwooding/go-arcgis/compare/v0.5.2...HEAD
+[0.6.0]: https://github.com/richardwooding/go-arcgis/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/richardwooding/go-arcgis/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/richardwooding/go-arcgis/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/richardwooding/go-arcgis/compare/v0.4.0...v0.5.0

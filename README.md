@@ -26,7 +26,7 @@ features, err := client.Layer(7).Query().
 go get github.com/richardwooding/go-arcgis
 ```
 
-Requires Go 1.26+. No third-party dependencies.
+Requires Go 1.27+. No third-party dependencies.
 
 ## Two styles, one engine
 
@@ -149,6 +149,21 @@ features, err := client.Layer(111).Query().
 For the City of Cape Town Open Data Portal, the companion package
 [`capetown-opendata`](https://github.com/richardwooding/capetown-opendata)
 ships these constructors and verified layer IDs ready to use.
+
+## Portal items
+
+Hosted datasets are often republished under new service names while keeping
+their portal item ID. `ItemInfo` fetches the item's metadata and `ItemURL`
+just the service URL it currently points at:
+
+```go
+item, err := arcgis.ItemInfo(ctx, arcgis.ArcGISOnline, "61bd1a6c374d44a093862784b79f6c23")
+if err != nil {
+    return err
+}
+fmt.Println(item.Title, item.ModifiedTime().Format(time.DateOnly))
+client := arcgis.NewClient(item.URL)
+```
 
 ## Ports
 
